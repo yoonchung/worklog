@@ -1,10 +1,19 @@
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from github import Github
+from github import Auth, Github
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 
 def load_github_token() -> str:
@@ -17,8 +26,30 @@ def load_github_token() -> str:
     return token
 
 
-def fetch_merged_pull_requests(repo_full_name: str, token: str):
-    gh = Github(token)
+def validate_repo_name(repo_full_name: str) -> None:
+    """Validate that repo_full_name is in 'owner/repo' format."""
+    if "/" not in repo_full_name:
+        logger.error("Invalid repository format: '%s'. Expected 'owner/repo'.", repo_full_name)
+        sys.exit(1)
+    parts = repo_full_name.split("/")
+    if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+        logger.error("Invalid repository format: '%s'. Expected 'owner/repo' with non-empty parts.", repo_full_name)
+        sys.exit(1)
+
+
+def fetch_merged_pull_requests(repo_full_name: str, token: str, max_prs: int | None = None) -> list:
+    """Fetch merged pull requests from a GitHub repository.
+
+    Args:
+        repo_full_name: GitHub repo in format "owner/repo"
+        token: GitHub personal access token
+        max_prs: Maximum number of PRs to fetch (None = fetch all)
+
+    Returns:
+        List of merged pull request objects
+    """
+    auth = Auth.Token(token=token)
+    gh = Github(auth=auth)
     repo = gh.get_repo(repo_full_name)
     pulls = repo.get_pulls(state="closed", sort="updated", direction="desc")
 
@@ -80,18 +111,20 @@ def raw_pr_data(pr):
 
 def main():
     if len(sys.argv) not in (2, 3):
-        print("Usage: python fetch.py owner/repo [output_filename]")
+        logger.error("Usage: python fetch.py owner/repo [output_filename]")
         sys.exit(1)
 
     repo_full_name = sys.argv[1].strip()
     output_filename = sys.argv[2].strip() if len(sys.argv) == 3 else "data.json"
     token = load_github_token()
 
-    # print(f"Fetching merged PRs for {repo_full_name}...\n")
+    logger.info("Fetching merged PRs for %s...", repo_full_name)
     merged_prs = fetch_merged_pull_requests(repo_full_name, token)
     # print(f"Found {len(merged_prs)} merged PR(s).\n")
 
     pr_data = []
+    logger.info("Processing %d merged PR(s)...", len(merged_prs))
+
     for pr in merged_prs:
         raw = raw_pr_data(pr)
         if raw is None:
@@ -110,13 +143,7 @@ def main():
     with output_path.open("w", encoding="utf-8") as out_file:
         json.dump(pr_data, out_file, indent=2, default=str)
 
-    print(f"Saved {len(pr_data)} PR entries to {output_path}")
-
-    # Instead of merged_prs, fetch commits
-    commits = fetch_commits(repo_full_name, token, max_commits=50)
-
-    for commit in commits:
-        print(json.dumps(format_commit_data(commit), indent=2))
+    logger.info("Saved %d PR entries to %s", len(pr_data), output_path)
 
 
 if __name__ == "__main__":

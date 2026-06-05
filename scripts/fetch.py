@@ -64,7 +64,7 @@ def fetch_merged_pull_requests(repo_full_name: str, token: str, max_prs: int | N
     return merged_prs
 
 
-def fetch_commits(repo_full_name: str, token: str, max_commits: int = None):
+def fetch_commits(repo_full_name: str, token: str, max_commits: int | None = None):
     """
     Fetch commits directly from a repository (alternative to PR-based fetching).
     

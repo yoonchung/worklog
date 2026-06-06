@@ -122,7 +122,6 @@ def build_prompt(item_obj, item_type="pr"):
         f"{HUMAN_PROMPT}\n{instruction}\nDATA:\n{json.dumps(data_section, indent=2, default=str)}\n"
         f"Please respond with a single JSON object only.\n{AI_PROMPT}\n"
     )
-    # print(f"Built prompt for {item_type}:\n{prompt}\n--- End of prompt ---\n")
     return prompt
 
 
@@ -191,7 +190,6 @@ def summarize_items(item_list, client, item_type="pr", model="claude-haiku-4-5",
         resp = call_anthropic(client, prompt, model=model, max_tokens=max_tokens)
 
         parsed = parse_llm_response(resp)
-        print(parsed)
 
         if item_type == "pr":
             parsed["pr_number"] = item.get("pr_number") if isinstance(item, dict) else getattr(item, "pr_number", None)
@@ -222,9 +220,7 @@ def load_input(path_or_dash):
         obj = json.loads(data)
         return obj
     else:
-        # print(f"Loading input from {path_or_dash}...")
         with open(path_or_dash, "r", encoding="utf-8") as f:
-            # print(f"File content:\n{f.read(500)}\n--- End of file preview ---")
             return json.load(f)
 
 

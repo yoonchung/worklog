@@ -27,14 +27,16 @@ def load_github_token() -> str:
 
 
 def validate_repo_name(repo_full_name: str) -> None:
-    """Validate that repo_full_name is in 'owner/repo' format."""
+    """Validate that repo_full_name is in 'owner/repo' format.
+
+    Raises:
+        ValueError: If the repository name is not in the expected format.
+    """
     if "/" not in repo_full_name:
-        logger.error("Invalid repository format: '%s'. Expected 'owner/repo'.", repo_full_name)
-        sys.exit(1)
-    parts = repo_full_name.split("/")
-    if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
-        logger.error("Invalid repository format: '%s'. Expected 'owner/repo' with non-empty parts.", repo_full_name)
-        sys.exit(1)
+        raise ValueError(f"Invalid repository format: '{repo_full_name}'. Expected 'owner/repo'.")
+    owner, repo = repo_full_name.split("/", 1)
+    if not owner.strip() or not repo.strip():
+        raise ValueError(f"Invalid repository format: '{repo_full_name}'. Expected non-empty owner and repo.")
 
 
 def fetch_merged_pull_requests(repo_full_name: str, token: str, max_prs: int | None = None) -> list:
@@ -193,7 +195,11 @@ def main():
     output_filename = sys.argv[2].strip() if len(sys.argv) == 3 else "pull_requests.json"
 
     # Validate repository format
-    validate_repo_name(repo_full_name)
+    try:
+        validate_repo_name(repo_full_name)
+    except ValueError as e:
+        logger.error(str(e))
+        sys.exit(1)
 
     token = load_github_token()
 

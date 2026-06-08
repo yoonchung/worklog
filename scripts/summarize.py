@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import re
+import httpx
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -39,8 +40,13 @@ def load_anthropic_client():
             local_base_url = os.environ.get("LOCAL_BASE_URL")
 
             if local_api_key and local_base_url:
-                logger.info("Using local API: %s", local_base_url)
-                return client(base_url=local_base_url, api_key=local_api_key)
+                try:
+                    httpx.get(local_base_url, timeout=3.0)
+                    logger.info("Using local API: %s", local_base_url)
+                    return client(base_url=local_base_url, api_key=local_api_key)
+                except httpx.ConnectError:
+                    logger.warning("Local LLM at %s is not reachable, falling back to production API.", local_base_url)
+
             logger.info("Using production Anthropic API")
             return client(api_key=key)
     raise RuntimeError("Could not initialize Anthropic client from library. Ensure 'anthropic' package is installed and up-to-date.")

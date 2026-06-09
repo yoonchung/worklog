@@ -22,9 +22,6 @@ try:
 except Exception:
     anthropic = None
 
-HUMAN_PROMPT = getattr(anthropic, "HUMAN_PROMPT", "Human:") if anthropic else "Human:"
-AI_PROMPT = getattr(anthropic, "AI_PROMPT", "Assistant:") if anthropic else "Assistant:"
-
 
 def load_anthropic_client():
     load_dotenv()
@@ -34,7 +31,7 @@ def load_anthropic_client():
 
     # Try common client constructors
     if anthropic:
-        client = getattr(anthropic, "Client", None) or getattr(anthropic, "Anthropic", None)
+        client = getattr(anthropic, "Anthropic", None)
         if client:
             local_api_key = os.environ.get("LOCAL_API_KEY")
             local_base_url = os.environ.get("LOCAL_BASE_URL")
@@ -92,7 +89,6 @@ def build_prompt(item_obj, item_type="pr"):
             "sha": sha,
             "message": message,
             "author": author_name,
-            "raw": item_obj,
         }
     else:
         title = _get_field(item_obj, "title", "")
@@ -121,12 +117,11 @@ def build_prompt(item_obj, item_type="pr"):
             "title": title,
             "description": description,
             "commit_messages": commit_messages,
-            "raw": item_obj,
         }
 
     prompt = (
-        f"{HUMAN_PROMPT}\n{instruction}\nDATA:\n{json.dumps(data_section, indent=2, default=str)}\n"
-        f"Please respond with a single JSON object only.\n{AI_PROMPT}\n"
+        f"{instruction}\nDATA:\n{json.dumps(data_section, indent=2, default=str)}\n"
+        f"Please respond with a single JSON object only."
     )
     return prompt
 
@@ -140,7 +135,7 @@ def call_anthropic(client, prompt, model="claude-haiku-4-5", max_tokens=512):
         )
         return resp
     except Exception as e:
-        raise RuntimeError(f"Anthropic API call failed: {e}")
+        raise RuntimeError(f"Anthropic API call failed: {e}") from e
 
 
 def determine_item_type(item_obj):
@@ -185,7 +180,7 @@ def parse_llm_response(resp) -> dict:
                 pass
 
     logger.warning("Could not parse LLM response as JSON, using raw text as summary")
-    return {"summary": str(resp)}
+    return {"summary": text or ""}
 
 def summarize_items(item_list, client, item_type="pr", model="claude-haiku-4-5", max_tokens=512):
     results = []
@@ -193,14 +188,18 @@ def summarize_items(item_list, client, item_type="pr", model="claude-haiku-4-5",
     for i, item in enumerate(item_list, 1):
         logger.info("[%d/%d] Summarizing %s...", i, total, item_type)
         prompt = build_prompt(item, item_type=item_type)
-        resp = call_anthropic(client, prompt, model=model, max_tokens=max_tokens)
+        try:
+            resp = call_anthropic(client, prompt, model=model, max_tokens=max_tokens)
+        except Exception as e:
+            logger.error("[%d/%d] Failed to summarize item: %s", i, total, e)
+            continue
 
         parsed = parse_llm_response(resp)
 
         if item_type == "pr":
-            parsed["pr_number"] = item.get("pr_number") if isinstance(item, dict) else getattr(item, "pr_number", None)
+            parsed["pr_number"] = _get_field(item, "pr_number") or _get_field(item, "number")
         else:
-            parsed["commit_sha"] = item.get("sha") if isinstance(item, dict) else getattr(item, "sha", None)
+            parsed["commit_sha"] = _get_field(item, "sha")
         parsed["_model_used"] = getattr(resp, "model", None) or model
         results.append(parsed)
         logger.info("[%d/%d] Done", i, total)

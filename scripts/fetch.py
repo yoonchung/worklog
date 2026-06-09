@@ -32,9 +32,9 @@ def validate_repo_name(repo_full_name: str) -> None:
     Raises:
         ValueError: If the repository name is not in the expected format.
     """
-    if "/" not in repo_full_name:
+    if repo_full_name.count("/") != 1:
         raise ValueError(f"Invalid repository format: '{repo_full_name}'. Expected 'owner/repo'.")
-    owner, repo = repo_full_name.split("/", 1)
+    owner, repo = repo_full_name.split("/")
     if not owner.strip() or not repo.strip():
         raise ValueError(f"Invalid repository format: '{repo_full_name}'. Expected non-empty owner and repo.")
 
@@ -51,46 +51,17 @@ def fetch_merged_pull_requests(repo_full_name: str, token: str, max_prs: int | N
         List of merged pull request objects
     """
     auth = Auth.Token(token=token)
-    gh = Github(auth=auth)
-    repo = gh.get_repo(repo_full_name)
-    pulls = repo.get_pulls(state="closed", sort="updated", direction="desc")
+    with Github(auth=auth) as gh:
+        repo = gh.get_repo(repo_full_name)
+        pulls = repo.get_pulls(state="closed", sort="updated", direction="desc")
 
-    merged_prs = []
-    count = 0
-    for pr in pulls:
-        if pr.is_merged():
-            merged_prs.append(pr)
-            count += 1
-            if max_prs and count >= max_prs:
-                break
-    return merged_prs
-
-
-def fetch_commits(repo_full_name: str, token: str, max_commits: int | None = None):
-    """
-    Fetch commits directly from a repository (alternative to PR-based fetching).
-    
-    Args:
-        repo_full_name: GitHub repo in format "owner/repo"
-        token: GitHub personal access token
-        max_commits: Maximum number of commits to fetch (None = fetch all)
-    
-    Returns:
-        List of commit objects
-    """
-    auth = Auth.Token(token=token)
-    gh = Github(auth=auth)
-    repo = gh.get_repo(repo_full_name)
-    commits = repo.get_commits()
-    
-    commit_list = []
-    count = 0
-    for commit in commits:
-        commit_list.append(commit)
-        count += 1
-        if max_commits and count >= max_commits:
-            break
-    return commit_list
+        merged_prs = []
+        for pr in pulls:
+            if pr.is_merged():
+                merged_prs.append(pr)
+                if max_prs is not None and len(merged_prs) >= max_prs:
+                    break
+        return merged_prs
 
 
 def get_commit_messages(pr, max_message_length: int = 200):
@@ -105,29 +76,15 @@ def get_commit_messages(pr, max_message_length: int = 200):
     """
     messages = []
     for commit in pr.get_commits():
-        msg = commit.commit.message
-        if msg and len(msg) > max_message_length:
+        msg = commit.commit.message or ""
+        if len(msg) > max_message_length:
             msg = msg[:max_message_length] + "..."
         messages.append(msg)
     return messages
 
 
 def raw_pr_data(pr):
-    """Retrieve raw data from a PR object.
-
-    This reads PyGithub internal attributes (_rawData or raw_data) that may
-    have been cached during initial fetch. It does NOT make additional API calls.
-
-    Args:
-        pr: PullRequest object from PyGithub
-
-    Returns:
-        Dict of raw PR data or None if not available
-    """
-    raw = getattr(pr, "raw_data", None)
-    if raw is None:
-        raw = getattr(pr, "_rawData", None)
-    return raw
+    return getattr(pr, "raw_data", None)
 
 def extract_pr_evaluation_data(pr):
     """Extract PR data relevant for work evaluation.
@@ -149,12 +106,14 @@ def extract_pr_evaluation_data(pr):
     # Collect simple serializable representations of comments
     try:
         comments = [c.body for c in pr.get_comments()]
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to fetch comments for PR #%d: %s", pr.number, e)
         comments = []
 
     try:
         review_comments = [c.body for c in pr.get_review_comments()]
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to fetch review comments for PR #%d: %s", pr.number, e)
         review_comments = []
 
     try:
@@ -166,7 +125,8 @@ def extract_pr_evaluation_data(pr):
             }
             for f in pr.get_files()
         ]
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to fetch files for PR #%d: %s", pr.number, e)
         files = []
 
     return {

@@ -55,7 +55,7 @@ def _get_field(item_obj, field, default=None):
     return getattr(item_obj, field, default)
 
 
-def build_prompt(item_obj, item_type="pr"):
+def _build_data_section(item_obj, item_type="pr") -> dict:
     if item_type == "commit":
         sha = _get_field(item_obj, "sha", "")
         message = ""
@@ -68,7 +68,34 @@ def build_prompt(item_obj, item_type="pr"):
                 author_name = author.get("name", "")
         if not message:
             message = _get_field(item_obj, "message", "")
+        return {
+            "sha": sha,
+            "message": message,
+            "author": author_name,
+        }
+    else:
+        commit_messages = _get_field(item_obj, "commit_messages") or _get_field(item_obj, "commits") or []
+        if isinstance(commit_messages, list):
+            commit_messages = "\n".join(str(m) for m in commit_messages)
+        return {
+            "pr_number": _get_field(item_obj, "pr_number"),
+            "title": _get_field(item_obj, "title", ""),
+            "description": _get_field(item_obj, "body", _get_field(item_obj, "description", "")),
+            "commit_messages": commit_messages,
+            "repo_description": _get_field(item_obj, "repo_description"),
+            "repo_language": _get_field(item_obj, "repo_language"),
+            "additions": _get_field(item_obj, "additions"),
+            "changed_files": _get_field(item_obj, "changed_files"),
+            "labels": _get_field(item_obj, "labels", []),
+            "merged_at": _get_field(item_obj, "merged_at"),
+            "comments": _get_field(item_obj, "comments", []),
+            "review_comments": _get_field(item_obj, "review_comments", []),
+            "files": _get_field(item_obj, "files", []),
+        }
 
+
+def build_prompt(item_obj, item_type="pr"):
+    if item_type == "commit":
         instruction = (
             "You are helping a software engineer document their work for future resume use.\n"
             "Given the following GitHub commit data, write a concise, resume-ready summary. Focus on:\n"
@@ -84,19 +111,7 @@ def build_prompt(item_obj, item_type="pr"):
             "- notes: optional brief notes or follow-ups for improvement with examples\n"
             "- confidence_score: float 0.0-1.0"
         )
-
-        data_section = {
-            "sha": sha,
-            "message": message,
-            "author": author_name,
-        }
     else:
-        title = _get_field(item_obj, "title", "")
-        description = _get_field(item_obj, "body", _get_field(item_obj, "description", ""))
-        commit_messages = _get_field(item_obj, "commit_messages") or _get_field(item_obj, "commits") or []
-        if isinstance(commit_messages, list):
-            commit_messages = "\n".join(str(m) for m in commit_messages)
-
         instruction = (
             "You are helping a software engineer document their work for future resume use.\n"
             "Given the following pull request data, write a concise, resume-ready summary. Focus on:\n"
@@ -113,12 +128,7 @@ def build_prompt(item_obj, item_type="pr"):
             "- confidence_score: float 0.0-1.0"
         )
 
-        data_section = {
-            "title": title,
-            "description": description,
-            "commit_messages": commit_messages,
-        }
-
+    data_section = _build_data_section(item_obj, item_type)
     prompt = (
         f"{instruction}\nDATA:\n{json.dumps(data_section, indent=2, default=str)}\n"
         f"Please respond with a single JSON object only."

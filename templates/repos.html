@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkLog — Repositories</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    h1 { margin-bottom: 8px; }
+    .user { color: #666; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+    th { background: #f5f5f5; }
+    form.inline { display: inline; }
+    button.delete { color: #c0392b; background: none; border: none; cursor: pointer; padding: 0; }
+    button.delete:hover { text-decoration: underline; }
+    .add-form { display: flex; gap: 8px; }
+    .add-form input[type=text] { flex: 1; padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
+    .add-form button[type=submit] { padding: 6px 16px; background: #2ea44f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    .add-form button[type=submit]:hover { background: #22863a; }
+    .empty { color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Repositories</h1>
+  <p class="user">Logged in as <strong>{{ user.github_username }}</strong></p>
+
+  {% if repos %}
+  <table>
+    <thead>
+      <tr>
+        <th>Repository</th>
+        <th>Last synced</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for repo in repos %}
+      <tr>
+        <td><a href="https://github.com/{{ repo.full_name }}" target="_blank">{{ repo.full_name }}</a></td>
+        <td>{{ repo.last_synced_at.strftime("%Y-%m-%d %H:%M") if repo.last_synced_at else "Never" }}</td>
+        <td>
+          <form class="inline" method="post" action="/repos/{{ repo.id }}/delete"
+                onsubmit="return confirm('Disconnect {{ repo.full_name }}?')">
+            <button class="delete" type="submit">Disconnect</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No repositories connected yet.</p>
+  {% endif %}
+
+  <h2>Connect a repository</h2>
+  <form class="add-form" method="post" action="/repos">
+    <input type="text" name="full_name" placeholder="owner/repo" required>
+    <button type="submit">Connect</button>
+  </form>
+</body>
+</html>

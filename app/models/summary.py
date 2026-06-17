@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, ForeignKey, Text, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -11,6 +11,6 @@ class Summary(Base):
     summary_text = Column(Text, nullable=False)
     is_resume_worthy = Column(Boolean, default=False, nullable=False)
     user_notes = Column(Text, nullable=True)
-    generated_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    generated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
 
     pull_request = relationship("PullRequest", back_populates="summaries")

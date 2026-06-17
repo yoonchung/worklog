@@ -8,6 +8,7 @@ from app.auth import decrypt_token
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Repository, User
+from app.sync import run_sync, seconds_until_sync_allowed
 
 router = APIRouter(prefix="/repos")
 templates = Jinja2Templates(directory="templates")
@@ -87,6 +88,29 @@ async def delete_repo_form(
     db.delete(repo)
     db.commit()
     return RedirectResponse(url="/repos", status_code=303)
+
+
+@router.post("/{repo_id}/sync")
+def sync_repo(
+    repo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    repo = db.get(Repository, repo_id)
+    if not repo or repo.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Repository not found")
+
+    remaining = seconds_until_sync_allowed(repo)
+    if remaining is not None:
+        mins, secs = divmod(remaining, 60)
+        raise HTTPException(
+            status_code=429,
+            detail=f"Synced too recently. Try again in {mins}m {secs}s.",
+        )
+
+    access_token = decrypt_token(current_user.access_token)
+    result = run_sync(repo, access_token, db)
+    return {"status": "ok", **result}
 
 
 @router.delete("/{repo_id}")

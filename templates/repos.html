@@ -5,6 +5,9 @@
   <title>WorkLog — Repositories</title>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    nav { margin-bottom: 28px; }
+    nav a { margin-right: 16px; color: #0969da; text-decoration: none; font-size: 14px; }
+    nav a:hover { text-decoration: underline; }
     h1 { margin-bottom: 8px; }
     .user { color: #666; margin-bottom: 24px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
@@ -21,6 +24,11 @@
   </style>
 </head>
 <body>
+  <nav>
+    <a href="/repos">Repositories</a>
+    <a href="/summaries">Summaries</a>
+  </nav>
+
   <h1>Repositories</h1>
   <p class="user">Logged in as <strong>{{ user.github_username }}</strong></p>
 

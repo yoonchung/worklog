@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkLog — Summaries</title>
+  <style>
+    body { font-family: sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; color: #222; }
+    nav { margin-bottom: 28px; }
+    nav a { margin-right: 16px; color: #0969da; text-decoration: none; font-size: 14px; }
+    nav a:hover { text-decoration: underline; }
+    h1 { margin-bottom: 4px; }
+    .user { color: #666; margin-bottom: 28px; font-size: 14px; }
+    .empty { color: #888; font-style: italic; }
+
+    .card {
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .card.resume-worthy { border-color: #1a7f37; background: #f6fff8; }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .meta { flex: 1; min-width: 0; }
+    .repo { font-size: 12px; color: #666; margin-bottom: 2px; }
+    .pr-title { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .date { font-size: 12px; color: #888; margin-top: 2px; }
+
+    .toggle-btn {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      padding: 4px 10px;
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      background: #f6f8fa;
+      cursor: pointer;
+      color: #444;
+      white-space: nowrap;
+    }
+    .toggle-btn:hover { background: #eaeef2; }
+    .toggle-btn.active { background: #dafbe1; border-color: #1a7f37; color: #1a7f37; font-weight: 600; }
+    .toggle-btn .star { font-size: 15px; }
+
+    .summary-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333;
+      margin-bottom: 14px;
+      white-space: pre-wrap;
+    }
+
+    .notes-section { display: flex; flex-direction: column; gap: 6px; }
+    .notes-label { font-size: 12px; color: #666; font-weight: 600; letter-spacing: 0.03em; }
+    .notes-row { display: flex; gap: 8px; align-items: flex-end; }
+    .notes-input {
+      flex: 1;
+      font-size: 13px;
+      font-family: inherit;
+      padding: 6px 8px;
+      border: 1px solid #d0d7de;
+      border-radius: 4px;
+      resize: vertical;
+      min-height: 52px;
+      color: #333;
+    }
+    .notes-input:focus { outline: none; border-color: #0969da; box-shadow: 0 0 0 2px rgba(9,105,218,0.15); }
+    .save-btn {
+      padding: 6px 14px;
+      font-size: 13px;
+      background: #0969da;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      align-self: flex-end;
+    }
+    .save-btn:hover { background: #0860ca; }
+    .save-status { font-size: 12px; color: #1a7f37; height: 16px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/repos">Repositories</a>
+    <a href="/summaries">Summaries</a>
+  </nav>
+
+  <h1>Summaries</h1>
+  <p class="user">Logged in as <strong>{{ user.github_username }}</strong></p>
+
+  {% if not summaries %}
+  <p class="empty">No summaries yet. Sync a repository from the <a href="/repos">Repositories</a> page to get started.</p>
+  {% endif %}
+
+  {% for s in summaries %}
+  <div class="card {% if s.is_resume_worthy %}resume-worthy{% endif %}" id="card-{{ s.id }}">
+    <div class="card-header">
+      <div class="meta">
+        <div class="repo">{{ s.pull_request.repository.full_name }}</div>
+        <div class="pr-title" title="{{ s.pull_request.title }}">{{ s.pull_request.title }}</div>
+        <div class="date">{{ s.generated_at.strftime("%Y-%m-%d") }}</div>
+      </div>
+      <button
+        class="toggle-btn {% if s.is_resume_worthy %}active{% endif %}"
+        id="toggle-{{ s.id }}"
+        onclick="toggleResumeWorthy({{ s.id }}, this)"
+        title="Mark as resume worthy"
+      >
+        <span class="star">{% if s.is_resume_worthy %}★{% else %}☆{% endif %}</span>
+        Resume worthy
+      </button>
+    </div>
+
+    <div class="summary-text">{{ s.summary_text }}</div>
+
+    <div class="notes-section">
+      <div class="notes-label">Notes</div>
+      <div class="notes-row">
+        <textarea
+          class="notes-input"
+          id="notes-{{ s.id }}"
+          placeholder="Add context that GitHub doesn't capture…"
+        >{{ s.user_notes or "" }}</textarea>
+        <button class="save-btn" onclick="saveNotes({{ s.id }})">Save</button>
+      </div>
+      <div class="save-status" id="status-{{ s.id }}"></div>
+    </div>
+  </div>
+  {% endfor %}
+
+  <script>
+    async function patch(id, body) {
+      const resp = await fetch(`/summaries/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!resp.ok) throw new Error(await resp.text());
+    }
+
+    async function toggleResumeWorthy(id, btn) {
+      const isActive = btn.classList.contains("active");
+      const next = !isActive;
+      try {
+        await patch(id, { is_resume_worthy: next });
+        btn.classList.toggle("active", next);
+        btn.querySelector(".star").textContent = next ? "★" : "☆";
+        document.getElementById(`card-${id}`).classList.toggle("resume-worthy", next);
+      } catch {
+        alert("Failed to update. Please try again.");
+      }
+    }
+
+    async function saveNotes(id) {
+      const notes = document.getElementById(`notes-${id}`).value;
+      const status = document.getElementById(`status-${id}`);
+      try {
+        await patch(id, { user_notes: notes });
+        status.textContent = "Saved";
+        setTimeout(() => (status.textContent = ""), 2000);
+      } catch {
+        status.textContent = "Error saving";
+        status.style.color = "#cf222e";
+      }
+    }
+  </script>
+</body>
+</html>

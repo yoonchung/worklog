@@ -12,13 +12,30 @@ pip install -r requirements.txt
 
 **2. Environment variables** — create a `.env` file:
 ```
+# CLI scripts (fetch + summarize without the web app)
 GITHUB_TOKEN=your_github_pat
 ANTHROPIC_API_KEY=your_anthropic_key
+
+# Web app — GitHub OAuth
+GITHUB_CLIENT_ID=your_oauth_app_client_id
+GITHUB_CLIENT_SECRET=your_oauth_app_client_secret
+GITHUB_REDIRECT_URI=http://localhost:8000/auth/callback
+
+# Web app — session + token encryption
+SESSION_SECRET_KEY=any_long_random_string
+FERNET_KEY=<generated — see below>
 
 # Optional: use a local LLM (e.g. LM Studio) instead of Anthropic
 LOCAL_BASE_URL=http://localhost:1234
 LOCAL_API_KEY=your_local_key
 ```
+
+To generate a `FERNET_KEY`:
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+The web app requires a GitHub OAuth app. Create one at [github.com/settings/developers](https://github.com/settings/developers) with callback URL `http://localhost:8000/auth/callback`.
 
 **3. PostgreSQL**
 ```bash
@@ -29,7 +46,15 @@ export DATABASE_URL="postgresql://$(whoami)@localhost:5432/worklog_db"
 python3 scripts/db_create_tables.py
 ```
 
-## Usage
+## Web app
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Open [http://localhost:8000](http://localhost:8000), login with GitHub, connect a repository, and click **Sync** to fetch and summarize its merged PRs. View, flag, and annotate summaries at `/summaries`.
+
+## CLI usage
 
 **Full pipeline** — fetch, summarize, and save to database:
 ```bash

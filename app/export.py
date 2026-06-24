@@ -2,7 +2,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session, joinedload
@@ -79,7 +79,10 @@ def polish_export(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from fastapi import HTTPException
     summaries = _fetch_resume_worthy(db, current_user.id)
+    if not summaries:
+        raise HTTPException(status_code=422, detail="No resume-worthy summaries to polish")
     grouped = _group_by_repo(summaries)
     raw = _format_plain(grouped)
 
@@ -99,7 +102,6 @@ Raw summaries:
     client = load_anthropic_client()
     result = call_anthropic(client, prompt, model=POLISH_MODEL, max_tokens=POLISH_MAX_TOKENS)
 
-    # call_anthropic returns the raw API response object; extract text
     if hasattr(result, "content"):
         return result.content[0].text
     return str(result)

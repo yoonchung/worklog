@@ -18,6 +18,11 @@ def _validate_full_name(full_name: str) -> str:
     full_name = full_name.strip()
     if full_name.count("/") != 1:
         raise HTTPException(status_code=400, detail="Repository must be in 'owner/repo' format")
+    owner, repo = full_name.split("/")
+    if not owner or not repo:
+        raise HTTPException(status_code=400, detail="Owner and repository name must not be empty")
+    if len(owner) > 100 or len(repo) > 100:
+        raise HTTPException(status_code=400, detail="Owner or repository name is too long")
     return full_name
 
 

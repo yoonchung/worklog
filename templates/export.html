@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkLog — Export</title>
+  <style>
+    body { font-family: sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; color: #222; }
+    nav { margin-bottom: 28px; }
+    nav a { margin-right: 16px; color: #0969da; text-decoration: none; font-size: 14px; }
+    nav a:hover { text-decoration: underline; }
+    h1 { margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 14px; margin-bottom: 28px; }
+    .empty { color: #888; font-style: italic; }
+
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 7px 16px;
+      font-size: 13px;
+      border-radius: 5px;
+      border: 1px solid #d0d7de;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-copy {
+      background: #f6f8fa;
+      color: #24292f;
+    }
+    .btn-copy:hover { background: #eaeef2; }
+    .btn-polish {
+      background: #0969da;
+      color: #fff;
+      border-color: #0969da;
+    }
+    .btn-polish:hover { background: #0860ca; }
+    .btn-polish:disabled { background: #6cb0f3; border-color: #6cb0f3; cursor: default; }
+    .copy-status { font-size: 12px; color: #1a7f37; }
+
+    .repo-section { margin-bottom: 32px; }
+    .repo-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      letter-spacing: 0.03em;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #eaeef2;
+    }
+    .bullet {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .bullet-dot { color: #0969da; flex-shrink: 0; font-weight: 700; }
+    .bullet-text { color: #333; }
+    .pr-title { font-size: 11px; color: #888; margin-top: 1px; }
+
+    .polish-output {
+      margin-top: 24px;
+      padding: 20px;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      display: none;
+    }
+    .polish-output h2 { font-size: 13px; color: #444; margin: 16px 0 6px; }
+    .polish-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .polish-label { font-weight: 600; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/repos">Repositories</a>
+    <a href="/summaries">Summaries</a>
+    <a href="/export">Export</a>
+  </nav>
+
+  <h1>Export</h1>
+  <p class="subtitle">
+    {% if total == 0 %}
+      No resume-worthy summaries yet — star some on the <a href="/summaries">Summaries</a> page.
+    {% else %}
+      {{ total }} resume-worthy {{ "summary" if total == 1 else "summaries" }} across {{ grouped|length }} {{ "repository" if grouped|length == 1 else "repositories" }}.
+    {% endif %}
+  </p>
+
+  {% if total > 0 %}
+  <div class="toolbar">
+    <button class="btn-copy" onclick="copyRaw()">Copy to clipboard</button>
+    <button class="btn-polish" id="polishBtn" onclick="polish()">Polish with AI</button>
+    <span class="copy-status" id="copyStatus"></span>
+  </div>
+
+  {% for repo, summaries in grouped.items() %}
+  <div class="repo-section">
+    <div class="repo-name">{{ repo }}</div>
+    {% for s in summaries %}
+    <div class="bullet">
+      <span class="bullet-dot">•</span>
+      <div>
+        <div class="bullet-text">{{ s.summary_text.strip() }}</div>
+        <div class="pr-title">{{ s.pull_request.title }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+
+  <div id="polishOutput" class="polish-output">
+    <div class="polish-header">
+      <span class="polish-label">AI-polished bullets</span>
+      <button class="btn-copy" onclick="copyPolished()">Copy</button>
+    </div>
+    <div id="polishText"></div>
+  </div>
+  {% endif %}
+
+  <textarea id="rawText" style="position:absolute;left:-9999px;top:-9999px" aria-hidden="true">{{ plain_text }}</textarea>
+
+  <script>
+    function copyRaw() {
+      const text = document.getElementById("rawText").value;
+      navigator.clipboard.writeText(text).then(() => {
+        const el = document.getElementById("copyStatus");
+        el.textContent = "Copied!";
+        setTimeout(() => el.textContent = "", 2000);
+      });
+    }
+
+    function copyPolished() {
+      const text = document.getElementById("polishText").innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        const el = document.getElementById("copyStatus");
+        el.textContent = "Copied!";
+        setTimeout(() => el.textContent = "", 2000);
+      });
+    }
+
+    async function polish() {
+      const btn = document.getElementById("polishBtn");
+      const output = document.getElementById("polishOutput");
+      const textEl = document.getElementById("polishText");
+
+      btn.disabled = true;
+      btn.textContent = "Polishing…";
+
+      try {
+        const resp = await fetch("/export/polish", { method: "POST" });
+        if (!resp.ok) throw new Error(await resp.text());
+        const text = await resp.text();
+        textEl.innerText = text;
+        output.style.display = "block";
+        output.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) {
+        alert("Failed to polish: " + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Polish with AI";
+      }
+    }
+  </script>
+</body>
+</html>

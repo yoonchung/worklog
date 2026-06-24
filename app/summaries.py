@@ -41,6 +41,12 @@ class SummaryPatch(BaseModel):
     is_resume_worthy: Optional[bool] = None
     user_notes: Optional[str] = None
 
+    def model_post_init(self, __context) -> None:
+        if self.is_resume_worthy is None and self.user_notes is None:
+            raise ValueError("At least one field must be provided")
+        if self.user_notes is not None and len(self.user_notes) > 2000:
+            raise ValueError("user_notes must be 2000 characters or fewer")
+
 
 @router.patch("/{summary_id}")
 async def patch_summary(

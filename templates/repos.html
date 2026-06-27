@@ -4,23 +4,28 @@
   <meta charset="UTF-8">
   <title>WorkLog — Repositories</title>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 0 16px; }
+    body { font-family: sans-serif; font-size: 14px; max-width: 800px; margin: 40px auto; padding: 0 16px; color: #222; }
     nav { margin-bottom: 28px; }
     nav a { margin-right: 16px; color: #0969da; text-decoration: none; font-size: 14px; }
     nav a:hover { text-decoration: underline; }
     h1 { margin-bottom: 8px; }
-    .user { color: #666; margin-bottom: 24px; }
+    .user { color: #666; font-size: 14px; margin-bottom: 28px; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 32px; }
     th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #ddd; }
     th { background: #f5f5f5; }
     form.inline { display: inline; }
-    button.delete { color: #c0392b; background: none; border: none; cursor: pointer; padding: 0; }
+    button.delete { color: #c0392b; background: none; border: none; cursor: pointer; padding: 0; font-size: inherit; font-family: inherit; }
     button.delete:hover { text-decoration: underline; }
+    button.sync { color: #0969da; background: none; border: none; cursor: pointer; padding: 0; font-size: inherit; font-family: inherit; }
+    button.sync:hover { text-decoration: underline; }
+    button.sync:disabled { color: #888; cursor: default; text-decoration: none; }
+    .actions { display: flex; align-items: center; gap: 12px; }
+    .sync-status { font-size: inherit; color: #666; }
     .add-form { display: flex; gap: 8px; }
     .add-form input[type=text] { flex: 1; padding: 6px 10px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px; }
     .add-form button[type=submit] { padding: 6px 16px; background: #2ea44f; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
     .add-form button[type=submit]:hover { background: #22863a; }
-    .empty { color: #888; font-style: italic; }
+    .empty { color: #666; font-size: 14px; }
   </style>
 </head>
 <body>
@@ -44,14 +49,18 @@
     </thead>
     <tbody>
       {% for repo in repos %}
-      <tr>
+      <tr id="row-{{ repo.id }}">
         <td><a href="https://github.com/{{ repo.full_name }}" target="_blank">{{ repo.full_name }}</a></td>
-        <td>{{ repo.last_synced_at.strftime("%Y-%m-%d %H:%M") if repo.last_synced_at else "Never" }}</td>
+        <td id="synced-{{ repo.id }}">{{ repo.last_synced_at.strftime("%Y-%m-%d %H:%M") if repo.last_synced_at else "Never" }}</td>
         <td>
-          <form class="inline" method="post" action="/repos/{{ repo.id }}/delete"
-                onsubmit="return confirm('Disconnect {{ repo.full_name }}?')">
-            <button class="delete" type="submit">Disconnect</button>
-          </form>
+          <div class="actions">
+            <button class="sync" id="sync-{{ repo.id }}" onclick="syncRepo({{ repo.id }}, this)">Sync</button>
+            <span class="sync-status" id="sync-status-{{ repo.id }}"></span>
+            <form class="inline" method="post" action="/repos/{{ repo.id }}/delete"
+                  onsubmit="return confirm('Disconnect {{ repo.full_name }}?')">
+              <button class="delete" type="submit">Disconnect</button>
+            </form>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -66,5 +75,32 @@
     <input type="text" name="full_name" placeholder="owner/repo" required>
     <button type="submit">Connect</button>
   </form>
+  <script>
+    async function syncRepo(id, btn) {
+      const status = document.getElementById(`sync-status-${id}`);
+      btn.disabled = true;
+      btn.textContent = "Syncing…";
+      status.textContent = "";
+
+      try {
+        const resp = await fetch(`/repos/${id}/sync`, { method: "POST" });
+        const data = await resp.json();
+        if (!resp.ok) {
+          status.textContent = data.detail || "Error";
+          status.style.color = "#c0392b";
+        } else {
+          status.textContent = `${data.synced} synced, ${data.skipped} skipped`;
+          status.style.color = "#1a7f37";
+          document.getElementById(`synced-${id}`).textContent = new Date().toISOString().slice(0, 16).replace("T", " ");
+        }
+      } catch (e) {
+        status.textContent = "Request failed";
+        status.style.color = "#c0392b";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Sync";
+      }
+    }
+  </script>
 </body>
 </html>

@@ -31,7 +31,7 @@ def seconds_until_sync_allowed(repo: Repository) -> int | None:
     return int(remaining) if remaining > 0 else None
 
 
-def _save_pr_and_summary(session: Session, repo_id: int, pr_obj, summary_dict: dict):
+def _save_pr_and_summary(session: Session, repo_id: int, pr_obj, pr_info: dict, summary_dict: dict):
     raw = raw_pr_data(pr_obj)
     if raw is None:
         raw = {
@@ -49,6 +49,7 @@ def _save_pr_and_summary(session: Session, repo_id: int, pr_obj, summary_dict: d
             title=pr_obj.title,
             description=pr_obj.body,
             merged_at=pr_obj.merged_at,
+            commits=pr_info.get("commit_messages"),
             raw_data=raw,
             created_at=datetime.now(UTC),
         )
@@ -96,7 +97,7 @@ def run_sync(repo: Repository, access_token: str, session: Session) -> dict:
         summary_dict = parse_llm_response(resp)
         try:
             with session.begin_nested():
-                _save_pr_and_summary(session, repo.id, pr, summary_dict)
+                _save_pr_and_summary(session, repo.id, pr, pr_info, summary_dict)
             saved += 1
         except Exception as e:
             logger.error("Failed to save PR #%d to DB: %s", pr.number, e)

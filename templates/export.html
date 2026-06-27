@@ -4,13 +4,14 @@
   <meta charset="UTF-8">
   <title>WorkLog — Export</title>
   <style>
-    body { font-family: sans-serif; max-width: 860px; margin: 40px auto; padding: 0 16px; color: #222; }
+    body { font-family: sans-serif; font-size: 14px; max-width: 860px; margin: 40px auto; padding: 0 16px; color: #222; }
     nav { margin-bottom: 28px; }
     nav a { margin-right: 16px; color: #0969da; text-decoration: none; font-size: 14px; }
     nav a:hover { text-decoration: underline; }
     h1 { margin-bottom: 4px; }
+    .user { color: #666; font-size: 14px; margin-bottom: 28px; }
     .subtitle { color: #666; font-size: 14px; margin-bottom: 28px; }
-    .empty { color: #888; font-style: italic; }
+    .empty { color: #666; font-size: 14px; }
 
     .toolbar {
       display: flex;
@@ -91,6 +92,7 @@
   </nav>
 
   <h1>Export</h1>
+  <p class="user">Logged in as <strong>{{ user.github_username }}</strong></p>
   <p class="subtitle">
     {% if total == 0 %}
       No resume-worthy summaries yet — star some on the <a href="/summaries">Summaries</a> page.

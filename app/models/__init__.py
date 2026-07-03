@@ -3,5 +3,6 @@ from app.models.user import User
 from app.models.repository import Repository
 from app.models.pull_request import PullRequest
 from app.models.summary import Summary
+from app.models.sync_log import SyncLog
 
-__all__ = ["Base", "User", "Repository", "PullRequest", "Summary"]
+__all__ = ["Base", "User", "Repository", "PullRequest", "Summary", "SyncLog"]

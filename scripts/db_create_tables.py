@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 # this script directly (e.g. `python scripts/db_create_tables.py`).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.models import Base, User, Repository, PullRequest, Summary
+from app.models import Base, User, Repository, PullRequest, Summary, SyncLog
 
 # Defaults to a local Postgres DB; override with DATABASE_URL env var
 DATABASE_URL = os.environ.get(

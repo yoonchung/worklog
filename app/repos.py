@@ -2,12 +2,13 @@ import httpx
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.auth import decrypt_token
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models import Repository, User
+from app.models.sync_log import SyncLog
 from app.sync import run_sync, seconds_until_sync_allowed
 
 router = APIRouter(prefix="/repos")
@@ -50,8 +51,17 @@ async def list_repos(
     current_user: User = Depends(get_current_user),
 ):
     repos = db.query(Repository).filter_by(user_id=current_user.id).all()
+    sync_logs = (
+        db.query(SyncLog)
+        .join(Repository, SyncLog.repo_id == Repository.id)
+        .filter(Repository.user_id == current_user.id)
+        .options(joinedload(SyncLog.repository))
+        .order_by(SyncLog.synced_at.desc())
+        .limit(20)
+        .all()
+    )
     return templates.TemplateResponse(
-        request, "repos.html", {"repos": repos, "user": current_user}
+        request, "repos.html", {"repos": repos, "user": current_user, "sync_logs": sync_logs}
     )
 
 

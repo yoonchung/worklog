@@ -1,4 +1,5 @@
 import logging
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -11,11 +12,20 @@ load_dotenv()
 from app.auth import decode_session_cookie, router as auth_router
 from app.export import router as export_router
 from app.repos import router as repos_router
+from app.scheduler import start_scheduler, stop_scheduler
 from app.summaries import router as summaries_router
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="WorkLog")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title="WorkLog", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 
 app.include_router(auth_router)

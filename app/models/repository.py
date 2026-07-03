@@ -14,3 +14,4 @@ class Repository(Base):
 
     user = relationship("User", back_populates="repositories")
     pull_requests = relationship("PullRequest", back_populates="repository", cascade="all, delete-orphan")
+    sync_logs = relationship("SyncLog", back_populates="repository", cascade="all, delete-orphan")
